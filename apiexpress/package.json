@@ -1,0 +1,19 @@
+{
+  "name": "apiexpress",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "docker:build": "docker build -t metro-api .",
+    "docker:run": "docker run --rm -p 3000:3000 metro-api",
+    "docker:rebuild": "docker build -t metro-api . && docker run --rm -p 3000:3000 metro-api"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

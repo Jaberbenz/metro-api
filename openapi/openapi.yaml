@@ -1,0 +1,158 @@
+openapi: 3.0.0
+info:
+  title: "API Metro Paris - Dernier Metro"
+  version: "1.0.0"
+  description: "API REST pour aider les usagers nocturnes à savoir s'ils attraperont le dernier métro depuis une station donnée."
+servers:
+  - url: "http://localhost:3000"
+paths:
+  /health:
+    get:
+      summary: "Health Check"
+      responses:
+        "200":
+          description: "Service OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /next-metro:
+    get:
+      summary: "Informations sur le prochain métro"
+      parameters:
+        - name: station
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "Chatelet"
+        - name: time
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "10:30"
+          description: "Heure simulée au format HH:MM"
+        - name: n
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          example: 3
+          description: "Nombre de prochains passages (1-5)"
+      responses:
+        "200":
+          description: "Informations du métro ou service fermé"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MetroInfo"
+                  - $ref: "#/components/schemas/MultipleArrivals"
+                  - $ref: "#/components/schemas/ServiceClosed"
+        "400":
+          description: "Paramètre manquant ou invalide"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Station inconnue avec suggestions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationError"
+
+components:
+  schemas:
+    MetroInfo:
+      type: object
+      properties:
+        station:
+          type: string
+        line:
+          type: string
+        headwayMin:
+          type: integer
+        nextArrival:
+          type: string
+        isLast:
+          type: boolean
+        tz:
+          type: string
+      example:
+        station: "Chatelet"
+        line: "M1"
+        headwayMin: 3
+        nextArrival: "12:34"
+        isLast: false
+        tz: "Europe/Paris"
+
+    MultipleArrivals:
+      type: object
+      properties:
+        station:
+          type: string
+        line:
+          type: string
+        headwayMin:
+          type: integer
+        tz:
+          type: string
+        arrivals:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+              isLast:
+                type: boolean
+      example:
+        station: "Chatelet"
+        line: "M1"
+        headwayMin: 3
+        tz: "Europe/Paris"
+        arrivals:
+          - time: "12:34"
+            isLast: false
+          - time: "12:37"
+            isLast: false
+          - time: "12:40"
+            isLast: false
+
+    ServiceClosed:
+      type: object
+      properties:
+        service:
+          type: string
+          example: "closed"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      example:
+        error: "missing station"
+
+    StationError:
+      type: object
+      properties:
+        error:
+          type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+      example:
+        error: "unknown station"
+        suggestions: ["Chatelet", "Concorde"]

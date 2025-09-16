@@ -1,0 +1,22 @@
+services:
+  api:
+    build: ./apiexpress # ← Changé de ./api vers ./apiexpress
+    image: metro-api:v1
+    environment:
+      - PORT=3000 # ← Changé de Port=5000 vers PORT=3000
+      - HEADWAY_MIN=3
+      - LAST_WINDOW_START=00:45
+      - SERVICE_END=01:15
+    ports:
+      - 3000:3000 # ← Changé de 5000:5000 vers 3000:3000
+
+  swagger:
+    image: swaggerapi/swagger-ui
+    environment:
+      - SWAGGER_JSON=/app/openapi/openapi.yaml
+    volumes:
+      - ./openapi/openapi.yaml:/app/openapi/openapi.yaml # ← Changé le chemin
+    ports:
+      - 8080:8080
+    depends_on:
+      - api

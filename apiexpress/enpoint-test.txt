@@ -1,0 +1,182 @@
+### HEALTH CHECK
+GET http://localhost:3000/health
+
+### METRO VALID REQUESTS (MVP)
+GET http://localhost:3000/next-metro?station=Chatelet
+GET http://localhost:3000/next-metro?station=République
+GET http://localhost:3000/next-metro?station=Bastille
+GET http://localhost:3000/next-metro?station=Nation
+GET http://localhost:3000/next-metro?station=Gare%20du%20Nord
+
+### ERROR 400 TESTS
+GET http://localhost:3000/next-metro
+GET http://localhost:3000/next-metro?station=
+GET http://localhost:3000/next-metro?other=param
+
+### ERROR 404 TESTS  
+GET http://localhost:3000/invalid
+GET http://localhost:3000/metro
+GET http://localhost:3000/health-check
+GET http://localhost:3000/next-metro/chatelet
+
+### EDGE CASES
+GET http://localhost:3000/next-metro?station=123
+GET http://localhost:3000/next-metro?station=Very%20Long%20Station%20Name
+GET http://localhost:3000/next-metro?station=Chatelet&extra=param
+
+### TIME SIMULATION TESTS
+
+# Service fermé (nuit) - Attendu: { "service": "closed" }
+GET http://localhost:3000/next-metro?station=Chatelet&time=03:00
+GET http://localhost:3000/next-metro?station=Chatelet&time=02:30
+GET http://localhost:3000/next-metro?station=Chatelet&time=04:45
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:30
+GET http://localhost:3000/next-metro?station=Chatelet&time=05:00
+
+# Dernières rames (00:45-01:15) - Attendu: isLast = true
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:50
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:00
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:10
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:45
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:15
+
+# Service normal - Attendu: isLast = false
+GET http://localhost:3000/next-metro?station=Chatelet&time=10:00
+GET http://localhost:3000/next-metro?station=Chatelet&time=18:30
+GET http://localhost:3000/next-metro?station=Chatelet&time=23:30
+GET http://localhost:3000/next-metro?station=Chatelet&time=05:30
+GET http://localhost:3000/next-metro?station=Chatelet&time=06:00
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:30
+
+# Tests limites des plages horaires
+GET http://localhost:3000/next-metro?station=Chatelet&time=05:29  # Service fermé
+GET http://localhost:3000/next-metro?station=Chatelet&time=05:30  # Service ouvert
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:44  # Service normal
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:45  # Dernières rames
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:15  # Dernières rames
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:16  # Service fermé
+
+# Tests avec différentes stations et heures simulées
+GET http://localhost:3000/next-metro?station=République&time=03:00
+GET http://localhost:3000/next-metro?station=Bastille&time=00:50
+GET http://localhost:3000/next-metro?station=Nation&time=10:00
+
+# Tests format d'heure invalide
+GET http://localhost:3000/next-metro?station=Chatelet&time=25:00
+GET http://localhost:3000/next-metro?station=Chatelet&time=12:70
+GET http://localhost:3000/next-metro?station=Chatelet&time=abc
+GET http://localhost:3000/next-metro?station=Chatelet&time=12h30
+
+### DÉFI A - VARIABLES D'ENVIRONNEMENT
+# Tests avec HEADWAY_MIN (lancer avec: docker run -e HEADWAY_MIN=5 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet  # Attendu: headwayMin=5
+GET http://localhost:3000/next-metro?station=Chatelet&n=3  # Attendu: 3 horaires espacés de 5min
+
+# Tests avec LAST_WINDOW_START (lancer avec: docker run -e LAST_WINDOW_START=00:40 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:42  # Attendu: isLast=true
+
+# Tests avec SERVICE_END (lancer avec: docker run -e SERVICE_END=01:20 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet&time=01:18  # Attendu: service ouvert
+
+# Tests combinés (docker run -e HEADWAY_MIN=7 -e LAST_WINDOW_START=00:30 -e SERVICE_END=01:30 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet&time=00:32  # Attendu: headwayMin=7, isLast=true
+
+### DÉFI B - N PROCHAINS PASSAGES
+
+# Format MVP (n=1 ou absent) - Attendu: format original avec nextArrival
+GET http://localhost:3000/next-metro?station=Chatelet
+GET http://localhost:3000/next-metro?station=Chatelet&n=1
+
+# Format nouveau (n>1) - Attendu: format avec arrivals[]
+GET http://localhost:3000/next-metro?station=Chatelet&n=2
+GET http://localhost:3000/next-metro?station=Chatelet&n=3
+GET http://localhost:3000/next-metro?station=Chatelet&n=4
+GET http://localhost:3000/next-metro?station=Chatelet&n=5
+
+# Tests isLast transitions avec n
+GET http://localhost:3000/next-metro?station=Chatelet&n=3&time=00:42  # Attendu: tous isLast=true
+GET http://localhost:3000/next-metro?station=Chatelet&n=5&time=00:41  # Attendu: mix isLast true/false
+GET http://localhost:3000/next-metro?station=Chatelet&n=3&time=01:12  # Attendu: transition fin service
+GET http://localhost:3000/next-metro?station=Chatelet&n=3&time=10:00  # Attendu: tous isLast=false
+
+# Validation limites n - Attendu: erreur 400
+GET http://localhost:3000/next-metro?station=Chatelet&n=0
+GET http://localhost:3000/next-metro?station=Chatelet&n=6
+GET http://localhost:3000/next-metro?station=Chatelet&n=-1
+
+# Tests avec variables ENV + n
+# (lancer avec: docker run -e HEADWAY_MIN=5 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet&n=3  # Attendu: 3 horaires espacés de 5min
+
+### DÉFI C - VALIDATION STATIONS + SUGGESTIONS
+
+# Stations valides - Attendu: réponse normale 200
+GET http://localhost:3000/next-metro?station=Chatelet
+GET http://localhost:3000/next-metro?station=République
+GET http://localhost:3000/next-metro?station=Bastille
+GET http://localhost:3000/next-metro?station=Nation
+GET http://localhost:3000/next-metro?station=Opéra
+GET http://localhost:3000/next-metro?station=Gare%20du%20Nord
+GET http://localhost:3000/next-metro?station=Concorde
+GET http://localhost:3000/next-metro?station=Louvre
+GET http://localhost:3000/next-metro?station=Palais%20Royal
+GET http://localhost:3000/next-metro?station=Tuileries
+
+# Suggestions par préfixe - Attendu: 404 avec suggestions
+GET http://localhost:3000/next-metro?station=Chate  # Suggestions: ["Chatelet"]
+GET http://localhost:3000/next-metro?station=Rep    # Suggestions: ["République"]
+GET http://localhost:3000/next-metro?station=Ba     # Suggestions: ["Bastille"]
+GET http://localhost:3000/next-metro?station=Ga     # Suggestions: ["Gare du Nord"]
+GET http://localhost:3000/next-metro?station=Con    # Suggestions: ["Concorde"]
+GET http://localhost:3000/next-metro?station=Lou    # Suggestions: ["Louvre"]
+GET http://localhost:3000/next-metro?station=Pal    # Suggestions: ["Palais Royal"]
+GET http://localhost:3000/next-metro?station=Tu     # Suggestions: ["Tuileries"]
+
+# Suggestions par substring - Attendu: 404 avec suggestions
+GET http://localhost:3000/next-metro?station=Royal  # Suggestions: ["Palais Royal"]
+GET http://localhost:3000/next-metro?station=Nord   # Suggestions: ["Gare du Nord"]
+GET http://localhost:3000/next-metro?station=elet   # Suggestions: ["Chatelet"]
+GET http://localhost:3000/next-metro?station=ille   # Suggestions: ["Bastille", "Tuileries"]
+
+# Aucune suggestion - Attendu: 404 avec suggestions: []
+GET http://localhost:3000/next-metro?station=Zzz
+GET http://localhost:3000/next-metro?station=XYZ123
+GET http://localhost:3000/next-metro?station=InvalidStation
+GET http://localhost:3000/next-metro?station=999
+
+# Tests casse (sensible) - Attendu: 404 avec suggestions
+GET http://localhost:3000/next-metro?station=chatelet     # Suggestions: ["Chatelet"]
+GET http://localhost:3000/next-metro?station=REPUBLIQUE   # Suggestions: ["République"]
+GET http://localhost:3000/next-metro?station=bastille     # Suggestions: ["Bastille"]
+GET http://localhost:3000/next-metro?station=CONCORDE     # Suggestions: ["Concorde"]
+
+# Tests courts (< 2 caractères) - Attendu: 404 avec suggestions: []
+GET http://localhost:3000/next-metro?station=C
+GET http://localhost:3000/next-metro?station=R
+GET http://localhost:3000/next-metro?station=B
+
+# Combinaison Défi C + Défi B - Attendu: 404 avec suggestions
+GET http://localhost:3000/next-metro?station=Chate&n=3
+GET http://localhost:3000/next-metro?station=Royal&n=2
+
+# Combinaison Défi C + simulation temps - Attendu: 404 avec suggestions
+GET http://localhost:3000/next-metro?station=Chate&time=10:00
+GET http://localhost:3000/next-metro?station=Royal&time=00:50
+
+### TESTS COMBINÉS (TOUS LES DÉFIS)
+
+# Défi A + B + C ensemble avec station valide
+# (lancer avec: docker run -e HEADWAY_MIN=5 -e LAST_WINDOW_START=00:40 metro-api)
+GET http://localhost:3000/next-metro?station=Chatelet&n=3&time=00:42
+
+# Défi A + B + C avec station invalide
+# (lancer avec: docker run -e HEADWAY_MIN=5 metro-api)
+GET http://localhost:3000/next-metro?station=Chate&n=3&time=10:00
+
+### TESTS DE PERFORMANCE
+# Requêtes multiples pour tester la stabilité
+GET http://localhost:3000/next-metro?station=Chatelet&n=5
+GET http://localhost:3000/next-metro?station=République&n=4
+GET http://localhost:3000/next-metro?station=Bastille&n=3
+GET http://localhost:3000/next-metro?station=Nation&n=2
+GET http://localhost:3000/next-metro?station=Opéra&n=1
